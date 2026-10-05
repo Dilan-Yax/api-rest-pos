@@ -1,4 +1,4 @@
-namespace ApiRestPos.Models;
+namespace ApiRestPos.Domain.Models;
 
 public class SaleItem
 {

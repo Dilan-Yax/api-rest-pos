@@ -1,5 +1,6 @@
+using ApiRestPos.Domain.IServices;
+using ApiRestPos.Dtos;
 using Microsoft.AspNetCore.Mvc;
-using ApiRestPos.Models;
 
 namespace ApiRestPos.Controllers;
 
@@ -7,36 +8,74 @@ namespace ApiRestPos.Controllers;
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
-    private static readonly List<Product> _products =
-    [
-        new Product { Id = 1, Name = "Laptop Gamer", Barcode = "75010001", Price = 12500.00m, Stock = 15, Category = "Electrónica" },
-        new Product { Id = 2, Name = "Mouse Inalámbrico", Barcode = "75010002", Price = 250.00m, Stock = 40, Category = "Accesorios" },
-        new Product { Id = 3, Name = "Teclado Mecánico", Barcode = "75010003", Price = 650.00m, Stock = 25, Category = "Accesorios" },
-        new Product { Id = 4, Name = "Monitor 27 Pulgadas", Barcode = "75010004", Price = 3200.00m, Stock = 10, Category = "Monitores" }
-    ];
+    private readonly IProductService _productService;
+
+    public ProductsController(IProductService productService)
+    {
+        _productService = productService;
+    }
 
     [HttpGet]
-    public ActionResult<IEnumerable<Product>> GetProducts()
+    public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
     {
-        return Ok(_products);
+        var products = await _productService.GetAllAsync();
+        return Ok(products);
     }
 
     [HttpGet("{id:int}")]
-    public ActionResult<Product> GetProductById(int id)
+    public async Task<ActionResult<ProductDto>> GetProductById(int id)
     {
-        var product = _products.FirstOrDefault(p => p.Id == id);
-        if (product == null)
+        var product = await _productService.GetByIdAsync(id);
+        if (product is null)
         {
             return NotFound(new { message = $"Producto con id {id} no encontrado." });
         }
+
         return Ok(product);
     }
 
     [HttpPost]
-    public ActionResult<Product> CreateProduct([FromBody] Product newProduct)
+    public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto dto)
     {
-        newProduct.Id = _products.Count > 0 ? _products.Max(p => p.Id) + 1 : 1;
-        _products.Add(newProduct);
-        return CreatedAtAction(nameof(GetProductById), new { id = newProduct.Id }, newProduct);
+        try
+        {
+            var created = await _productService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetProductById), new { id = created.Id }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<ProductDto>> UpdateProduct(int id, [FromBody] UpdateProductDto dto)
+    {
+        try
+        {
+            var updated = await _productService.UpdateAsync(id, dto);
+            if (updated is null)
+            {
+                return NotFound(new { message = $"Producto con id {id} no encontrado." });
+            }
+
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteProduct(int id)
+    {
+        var deleted = await _productService.DeleteAsync(id);
+        if (!deleted)
+        {
+            return NotFound(new { message = $"Producto con id {id} no encontrado." });
+        }
+
+        return NoContent();
     }
 }
